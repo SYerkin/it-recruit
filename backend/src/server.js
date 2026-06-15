@@ -55,7 +55,9 @@ async function main() {
 
 main()
   .then(async () => {
-    await killPort(PORT);
+    if (process.env.NODE_ENV !== 'production') {
+      await killPort(PORT);
+    }
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);

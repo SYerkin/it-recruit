@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { companyApi, jobApi } from '@shared/api';
+import { getApiOrigin } from '@shared/api/config';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -852,7 +853,7 @@ export const CompanyDetails: React.FC = () => {
           <HeroInner>
             <LogoContainer>
               <LogoImage $initials={initials}>
-                {company.logoUrl ? <LogoImg src={`${(import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace('/api', '')}${company.logoUrl}`} alt={company.name} /> : initials}
+                {company.logoUrl ? <LogoImg src={`${getApiOrigin()}${company.logoUrl}`} alt={company.name} /> : initials}
               </LogoImage>
             </LogoContainer>
             <HeroText>
@@ -936,7 +937,7 @@ export const CompanyDetails: React.FC = () => {
                           {company.documents.map((doc, index) => (
                             <DocumentLink
                               key={`${doc}-${index}`}
-                              href={doc.startsWith('http') ? doc : `${(import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace('/api', '')}${doc}`}
+                              href={doc.startsWith('http') ? doc : `${getApiOrigin()}${doc}`}
                               target="_blank"
                               rel="noreferrer"
                             >

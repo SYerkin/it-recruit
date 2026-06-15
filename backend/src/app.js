@@ -69,13 +69,27 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ 
+// API 404
+app.use('/api', (req, res) => {
+  res.status(404).json({
     success: false,
-    error: 'Route not found' 
+    error: 'Route not found',
   });
 });
+
+// Production: serve built frontend from the same service
+if (process.env.NODE_ENV === 'production') {
+  const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDist, 'index.html'), (err) => {
+      if (err) next(err);
+    });
+  });
+}
 
 // Error handler
 app.use((err, req, res, next) => {

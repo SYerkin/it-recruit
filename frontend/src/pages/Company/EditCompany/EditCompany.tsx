@@ -7,6 +7,7 @@ import styled from 'styled-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { companyApi } from '@shared/api';
 import { ArrowLeft, ArrowRight, Building2, FileText, MapPin, ShieldCheck, Upload, Users } from 'lucide-react';
+import { getApiOrigin } from '@shared/api/config';
 import { Button } from '@shared/ui/Button';
 
 const Container = styled.div`
@@ -210,7 +211,7 @@ export const EditCompany: React.FC = () => {
   }
 
   const logoUrl = watch('logoUrl');
-  const apiOrigin = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace(/\/api\/?$/, '');
+  const apiOrigin = getApiOrigin();
 
   return (
     <Container>

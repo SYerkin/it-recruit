@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { ArrowLeft, Mail, Calendar, Briefcase, MapPin, User, FileText, Award, GraduationCap, MessageSquare, Send, Paperclip, Star } from 'lucide-react';
 import { applicationApi } from '@shared/api';
 import { useAuthStore } from '@app/store/auth.store';
+import { getApiOrigin } from '@shared/api/config';
 import { Button } from '@shared/ui/Button';
 import { Card } from '@shared/ui/Card';
 import { Badge } from '@shared/ui/Badge';
@@ -459,7 +460,7 @@ export const ApplicationDetails: React.FC = () => {
     e.target.value = '';
   };
 
-  const apiOrigin = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace(/\/api\/?$/, '');
+  const apiOrigin = getApiOrigin();
 
   if (isLoading) {
     return (

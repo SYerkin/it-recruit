@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
 import { applicationApi, type ApplicationFeedback } from '@shared/api';
+import { getApiOrigin } from '@shared/api/config';
 import { useAuthStore } from '@app/store/auth.store';
 import { 
   CheckCircle, 
@@ -761,7 +762,7 @@ export const CandidateTimeline: React.FC = () => {
     e.target.value = '';
   };
 
-  const apiOrigin = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api').replace(/\/api\/?$/, '');
+  const apiOrigin = getApiOrigin();
 
   useEffect(() => {
     if (myFeedback) {
