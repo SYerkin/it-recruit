@@ -1,11 +1,13 @@
+import './config.js';
 import app from './app.js';
 import { PrismaClient } from '@prisma/client';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { config } from './config.js';
 
 const execAsync = promisify(exec);
 const prisma = new PrismaClient();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || config.port;
 
 // Функция для освобождения порта
 async function killPort(port) {
@@ -55,13 +57,13 @@ async function main() {
 
 main()
   .then(async () => {
-    if (process.env.NODE_ENV !== 'production') {
+    if (config.nodeEnv !== 'production') {
       await killPort(PORT);
     }
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
-      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🗄️  Database: ${process.env.DATABASE_URL?.includes('postgres') ? 'PostgreSQL' : 'SQLite'}`);
+      console.log(`📊 Environment: ${config.nodeEnv}`);
+      console.log(`🗄️  Database: PostgreSQL (Supabase)`);
     });
   })
   .catch(async (error) => {

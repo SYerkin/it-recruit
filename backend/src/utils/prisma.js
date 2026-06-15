@@ -1,13 +1,15 @@
+import '../config.js';
 import { PrismaClient } from '@prisma/client';
+import { config } from '../config.js';
 
 // Singleton pattern for Prisma Client
 const globalForPrisma = global;
 
 export const prisma = globalForPrisma.prisma || new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  log: config.nodeEnv === 'development' ? ['query', 'error', 'warn'] : ['error'],
 });
 
-if (process.env.NODE_ENV !== 'production') {
+if (config.nodeEnv !== 'production') {
   globalForPrisma.prisma = prisma;
 }
 

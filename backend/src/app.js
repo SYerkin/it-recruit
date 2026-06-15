@@ -1,13 +1,10 @@
+import './config.js';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Загружаем .env из корня backend (работает при запуске из любой папки)
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+import { config } from './config.js';
 import authRoutes from './routes/auth.routes.js';
 import jobRoutes from './routes/job.routes.js';
 import profileRoutes from './routes/profile.routes.js';
@@ -24,10 +21,12 @@ import adminRoutes from './routes/admin.routes.js';
 import feedbackRoutes from './routes/feedback.routes.js';
 import recommendationRoutes from './routes/recommendation.routes.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const app = express();
 
 // Middleware
-const corsOrigin = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((item) => item.trim()) : '*';
+const corsOrigin = '*';
 app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -78,7 +77,7 @@ app.use('/api', (req, res) => {
 });
 
 // Production: serve built frontend from the same service
-if (process.env.NODE_ENV === 'production') {
+if (config.nodeEnv === 'production') {
   const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
   app.use(express.static(frontendDist));
   app.get('*', (req, res, next) => {
@@ -97,7 +96,7 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({
     success: false,
     error: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    ...(config.nodeEnv === 'development' && { stack: err.stack })
   });
 });
 
