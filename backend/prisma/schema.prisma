@@ -1,0 +1,598 @@
+// Prisma Schema for IT Recruit Platform
+// Dev: SQLite, Prod: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User model with roles: ADMIN, HR, CANDIDATE
+model User {
+  id               Int              @id @default(autoincrement())
+  email            String           @unique
+  password         String
+  role             String           @default("CANDIDATE") // ADMIN, HR, CANDIDATE
+  telegramUsername String?          // @username без @ для ссылки t.me/username
+  
+  // Relations
+  profile   CandidateProfile?
+  company   Company?         // HR owns a company
+  jobsCreated Job[]          @relation("JobCreator")
+  invitationsSent Invitation[] @relation("InvitationCreator")
+  applicationFeedbacks ApplicationFeedback[]
+  applicationStatusChanges ApplicationStatusHistory[] @relation("ApplicationStatusChangedBy")
+  chatMessages         ChatMessage[]
+  mentorProfile        Mentor?
+  mentorRequests       MentorRequest[]
+  mentorReviews        MentorReview[]
+  payments             Payment[]
+  feedbackMessages     FeedbackMessage[]
+  mentorApplications   MentorApplication[]
+  verificationRequestsSubmitted VerificationRequest[] @relation("SubmittedBy")
+  verificationRequestsReviewed  VerificationRequest[] @relation("ReviewedBy")
+  profileViewsGiven            CandidateProfileView[] @relation("CandidateProfileViewByHr")
+  
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  
+  @@map("users")
+}
+
+// Candidate Profile (1:1 with User)
+model CandidateProfile {
+  id            Int              @id @default(autoincrement())
+  userId        Int              @unique
+  firstName     String
+  lastName      String
+  phone         String?
+  headline      String?          // e.g. "Senior Java Dev"
+  summary       String?
+  githubUrl     String?
+  linkedinUrl   String?
+  avatarUrl     String?
+  cvFileUrl     String?          // Path to PDF
+  isOpenToWork  Boolean          @default(true)
+  viewsCount    Int              @default(0) // Количество просмотров профиля
+  
+  // Relations
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills        CandidateSkill[]
+  workExperiences WorkExperience[]
+  educations    Education[]
+  certificates  Certificate[]
+  favoriteJobs  FavoriteJob[]
+  applications  Application[]
+  invitations   Invitation[]
+  views         CandidateProfileView[]
+  
+  // Privacy settings
+  isPublicProfile Boolean        @default(false) // Allow public anonymous view
+  
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  
+  @@map("candidate_profiles")
+}
+
+model CandidateProfileView {
+  id                 Int              @id @default(autoincrement())
+  candidateProfileId Int
+  viewedByUserId     Int
+  viewsCount         Int              @default(1)
+  firstViewedAt      DateTime         @default(now())
+  lastViewedAt       DateTime         @default(now())
+
+  candidateProfile   CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  viewedBy           User             @relation("CandidateProfileViewByHr", fields: [viewedByUserId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateProfileId, viewedByUserId])
+  @@index([candidateProfileId, lastViewedAt])
+  @@index([viewedByUserId])
+  @@map("candidate_profile_views")
+}
+
+// Work Experience (1:N with CandidateProfile)
+model WorkExperience {
+  id            Int              @id @default(autoincrement())
+  candidateProfileId Int
+  companyName   String
+  position      String
+  startDate     DateTime
+  endDate       DateTime?
+  description   String?
+  
+  // Relations
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  
+  @@map("work_experiences")
+}
+
+// Education (1:N with CandidateProfile)
+model Education {
+  id            Int              @id @default(autoincrement())
+  candidateProfileId Int
+  institution   String
+  degree        String?
+  fieldOfStudy  String?
+  startDate     DateTime?
+  endDate       DateTime?
+  description   String?
+  
+  // Relations
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  
+  @@map("educations")
+}
+
+// Certificate (1:N with CandidateProfile)
+model Certificate {
+  id            Int              @id @default(autoincrement())
+  candidateProfileId Int
+  name          String
+  issuer        String?         // Кто выдал сертификат
+  issueDate     DateTime?
+  expiryDate    DateTime?
+  credentialId  String?         // ID сертификата/ссылка
+  credentialUrl String?         // URL для проверки
+  
+  // Relations
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  
+  @@map("certificates")
+}
+
+// Favorite Job (Many-to-many: CandidateProfile <-> Job)
+model FavoriteJob {
+  candidateProfileId Int
+  jobId               Int
+  candidateProfile    CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  job                 Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  createdAt           DateTime         @default(now())
+  
+  @@id([candidateProfileId, jobId])
+  @@index([candidateProfileId])
+  @@index([jobId])
+  @@map("favorite_jobs")
+}
+
+// Skill / Technology
+model Skill {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  category    String           @default("OTHER") // FRONTEND, BACKEND, DATABASE, DEVOPS, MOBILE, OTHER
+  
+  // Relations
+  candidates  CandidateSkill[]
+  jobs        JobSkill[]
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  
+  @@map("skills")
+}
+
+// Many-to-many: CandidateProfile <-> Skill
+model CandidateSkill {
+  candidateProfileId Int
+  skillId            Int
+  proficiencyLevel   String           @default("BASIC") // BASIC, INTERMEDIATE, ADVANCED
+  yearsOfExperience  Int?             // Years of experience with this skill
+  candidateProfile   CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  skill              Skill            @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  
+  @@id([candidateProfileId, skillId])
+  @@map("candidate_skills")
+}
+
+// Company (created by HR)
+model Company {
+  id          Int              @id @default(autoincrement())
+  name        String
+  description String?
+  address     String?          // Адрес/локация компании
+  address2gis String?          // Ссылка на адрес в 2GIS
+  logoUrl     String?
+  website     String?
+  industry    String?
+  socialLinks String?          // JSON: { linkedin, hh, telegram, instagram }
+  isVerified  Boolean          @default(false)
+  foundedYear Int?             // Год основания компании
+  employeeCount String?        // e.g. "1-10", "11-50", "51-200", "201-500", "500+"
+  documents   String?          // JSON array of document URLs
+  officePhotos String?         // JSON array of office photo URLs
+  
+  ownerId     Int              @unique // HR user who owns the company
+  owner       User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  // Relations
+  jobs        Job[]
+  verificationRequests VerificationRequest[]
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  
+  @@index([ownerId])
+  @@map("companies")
+}
+
+// Job (Vacancy)
+model Job {
+  id          Int              @id @default(autoincrement())
+  title       String
+  description String
+  responsibilities String?    // Обязанности
+  benefits    String?          // Бенефиты/Выгоды
+  salaryMin   Int?
+  salaryMax   Int?
+  applyDeadline DateTime?
+  isHot       Boolean          @default(false)
+  currency    String           @default("USD")
+  status      String           @default("DRAFT") // DRAFT, ACTIVE, CLOSED
+  viewsCount  Int              @default(0) // Количество просмотров вакансии
+  
+  // Теги
+  workSchedule String?         // FULL_TIME, PART_TIME
+  workMode     String?         // OFFICE, REMOTE, HYBRID
+  workType     String?         // PERMANENT, PROJECT
+  experienceLevel String?      // INTERN, JUNIOR, MIDDLE, SENIOR
+  
+  creatorId   Int
+  creator     User             @relation("JobCreator", fields: [creatorId], references: [id])
+  
+  companyId   Int
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  // Relations
+  requiredSkills JobSkill[]
+  applications   Application[]
+  invitations    Invitation[]
+  favoriteJobs   FavoriteJob[]
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  
+  @@index([creatorId])
+  @@index([companyId])
+  @@index([status])
+  @@index([workSchedule])
+  @@index([workMode])
+  @@index([experienceLevel])
+  @@map("jobs")
+}
+
+// Many-to-many: Job <-> Skill
+model JobSkill {
+  jobId   Int
+  skillId Int
+  job     Job   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skill   Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  
+  @@id([jobId, skillId])
+  @@map("job_skills")
+}
+
+// Application (initiated by candidate)
+model Application {
+  id              Int                @id @default(autoincrement())
+  jobId           Int
+  candidateProfileId Int
+  status          String           @default("APPLIED") // APPLIED, SCREENING, INTERVIEW, OFFER, REJECTED, HIRED
+  coverLetter     String?
+  
+  // Relations
+  job             Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateProfile CandidateProfile  @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  feedbacks       ApplicationFeedback[]
+  statusHistory   ApplicationStatusHistory[]
+  conversation    Conversation?
+  
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  
+  @@unique([jobId, candidateProfileId])
+  @@index([candidateProfileId])
+  @@index([status])
+  @@map("applications")
+}
+
+model ApplicationStatusHistory {
+  id            Int         @id @default(autoincrement())
+  applicationId Int
+  fromStatus    String?
+  toStatus      String
+  changedById   Int?
+  changedByRole String?
+  note          String?
+  createdAt     DateTime    @default(now())
+
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  changedBy     User?       @relation("ApplicationStatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([applicationId, createdAt])
+  @@index([changedById])
+  @@map("application_status_history")
+}
+
+// Чат между кандидатом и HR по заявке (один чат на заявку)
+model Conversation {
+  id              Int       @id @default(autoincrement())
+  applicationId   Int       @unique
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  messages        ChatMessage[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@map("conversations")
+}
+
+// Сообщение в чате
+model ChatMessage {
+  id              Int       @id @default(autoincrement())
+  conversationId  Int
+  authorId        Int
+  body            String?   // Текст (может быть пустым если только файл)
+  attachmentName  String?   // Оригинальное имя файла
+  attachmentPath  String?   // Путь на сервере (uploads/...)
+  readAt          DateTime? // Когда прочитал получатель
+  
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author          User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime    @default(now())
+  
+  @@index([conversationId])
+  @@index([authorId])
+  @@map("chat_messages")
+}
+
+// Отзыв о процессе найма после завершения (HIRED или REJECTED). Могут оставить и HR, и кандидат.
+// Рейтинг 1–10, плюс оценки по критериям (JSON).
+model ApplicationFeedback {
+  id               Int      @id @default(autoincrement())
+  applicationId    Int
+  authorId         Int      // User (HR или CANDIDATE)
+  authorRole       String?  // CANDIDATE или HR
+  targetRole       String?  // На кого отзыв
+  rating           Int      // Общая оценка 1–10
+  criteriaRatings  String?  // JSON: { "communication": 8, "speed": 7, "transparency": 9, "professionalism": 9 }
+  comment          String?  // Текстовый отзыв
+  isVisible        Boolean  @default(true)
+  
+  application      Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  author           User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  createdAt        DateTime    @default(now())
+  
+  @@unique([applicationId, authorId])
+  @@index([applicationId])
+  @@index([authorId])
+  @@map("application_feedbacks")
+}
+
+// Invitation (initiated by HR)
+model Invitation {
+  id              Int                @id @default(autoincrement())
+  jobId           Int
+  candidateProfileId Int
+  status          String           @default("PENDING") // PENDING, ACCEPTED, DECLINED, EXPIRED
+  message         String?            // Personal message from HR
+  invitedById     Int                // HR who sent the invitation
+  
+  // Relations
+  job             Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateProfile CandidateProfile  @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  invitedBy       User               @relation("InvitationCreator", fields: [invitedById], references: [id])
+  
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  expiresAt       DateTime?          // Optional expiration date
+  
+  @@unique([jobId, candidateProfileId])
+  @@index([candidateProfileId])
+  @@index([status])
+  @@index([invitedById])
+  @@map("invitations")
+}
+
+// ─── Mentors ────────────────────────────────────────────────────────────────
+
+// Ментор / наставник
+model Mentor {
+  id              Int       @id @default(autoincrement())
+  userId          Int?      @unique // если ментор — зарегистрированный пользователь
+  name            String
+  avatarUrl       String?
+  title           String    // "Senior Frontend Developer at Kaspi"
+  company         String?
+  bio             String
+  skills          String    // JSON: ["React", "TypeScript"]
+  experienceYears Int       @default(0)
+  pricePerSession Int       @default(0) // в тенге, 0 = бесплатно
+  sessionDuration Int       @default(60) // минут
+  isActive        Boolean   @default(true)
+  rating          Float     @default(0)
+  reviewsCount    Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user     User?          @relation(fields: [userId], references: [id])
+  requests MentorRequest[]
+  reviews  MentorReview[]
+
+  @@map("mentors")
+}
+
+// Заявка на сессию с ментором
+model MentorRequest {
+  id        Int      @id @default(autoincrement())
+  mentorId  Int
+  userId    Int
+  name      String
+  email     String
+  message   String
+  goal      String   // "найти работу", "вырасти до middle", etc.
+  status    String   @default("PENDING") // PENDING, PAID, CONFIRMED, COMPLETED, CANCELLED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mentor  Mentor   @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment Payment? // псевдо-платёж, если сессия платная
+
+  @@index([mentorId])
+  @@index([userId])
+  @@map("mentor_requests")
+}
+
+// Отзыв о менторе
+model MentorReview {
+  id        Int      @id @default(autoincrement())
+  mentorId  Int
+  userId    Int
+  rating    Int      // 1–5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  mentor Mentor @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([mentorId, userId])
+  @@map("mentor_reviews")
+}
+
+// Псевдо-платёж (суммы в тенге, без реального процессинга)
+model Payment {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  amount          Int      // в тенге
+  currency        String   @default("KZT")
+  type            String   // MENTOR_SESSION, COURSE_ACCESS
+  mentorRequestId Int?     @unique // связь с запросом к ментору
+  status          String   @default("COMPLETED") // PENDING, COMPLETED, FAILED
+  cardLast4       String   // последние 4 цифры (маскировано)
+  cardHolder      String
+  createdAt       DateTime @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mentorRequest MentorRequest? @relation(fields: [mentorRequestId], references: [id])
+
+  @@index([userId])
+  @@map("payments")
+}
+
+// ─── Feedback ────────────────────────────────────────────────────────────────
+
+// Обратная связь от пользователей (пожелания, баги, предложения)
+model FeedbackMessage {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  name      String
+  email     String
+  type      String   @default("GENERAL") // SUGGESTION, BUG_REPORT, GENERAL
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("feedback_messages")
+}
+
+// Заявка на роль ментора
+model MentorApplication {
+  id           Int      @id @default(autoincrement())
+  userId       Int?
+  name         String
+  email        String
+  currentTitle String
+  experienceYears Int   @default(0)
+  skills       String   // через запятую
+  bio          String
+  motivation   String
+  status       String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  adminComment String?
+  createdAt    DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("mentor_applications")
+}
+
+// ─── Recommendations ──────────────────────────────────────────────────────────
+
+model RecommendationCategory {
+  id        Int      @id @default(autoincrement())
+  title     String
+  icon      String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items RecommendationItem[]
+
+  @@map("recommendation_categories")
+}
+
+model RecommendationItem {
+  id          Int      @id @default(autoincrement())
+  categoryId  Int
+  title       String
+  description String?
+  url         String?
+  imageUrl    String?
+  tags        String?  // JSON: ["React", "Beginner", "Free"]
+  isFree      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category RecommendationCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+  @@map("recommendation_items")
+}
+
+// ─── Company Verification ─────────────────────────────────────────────────────
+
+model VerificationRequest {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  submittedById Int
+  documents     String   // JSON: [{ name, url }]
+  comment       String?
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  adminComment  String?
+  reviewedAt    DateTime?
+  reviewedById  Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  submittedBy User    @relation("SubmittedBy", fields: [submittedById], references: [id], onDelete: Cascade)
+  reviewedBy  User?   @relation("ReviewedBy", fields: [reviewedById], references: [id])
+
+  @@index([companyId])
+  @@index([submittedById])
+  @@index([reviewedById])
+  @@map("verification_requests")
+}
+
+// Note: SQLite doesn't support enums, using String with validation in application code
+// Valid values are documented in comments above each field

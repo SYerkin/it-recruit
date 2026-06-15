@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+frontend/dist/
+
+# Environment
+.env
+.env.local
+*.db
+*.db-shm
+*.db-wal
+
+# Archives
+*.zip
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
